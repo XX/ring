@@ -296,11 +296,11 @@ fn main() {
     match read_env_var(RING_PREGENERATE_ASM).as_deref() {
         Ok("1") => {
             pregenerate_asm_main();
-        }
+        },
         Err(std::env::VarError::NotPresent) => ring_build_rs_main(),
         _ => {
             panic!("${} has an invalid value", RING_PREGENERATE_ASM);
-        }
+        },
     }
 }
 
@@ -347,13 +347,7 @@ fn ring_build_rs_main() {
     };
     let pregenerated = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join(PREGENERATED);
 
-    build_c_code(
-        &target,
-        pregenerated,
-        &out_dir,
-        &ring_core_prefix(),
-        use_pregenerated,
-    );
+    build_c_code(&target, pregenerated, &out_dir, &ring_core_prefix(), use_pregenerated);
     emit_rerun_if_changed()
 }
 
@@ -434,18 +428,13 @@ fn build_c_code(
         }
     }
 
-    let asm_target = ASM_TARGETS.iter().find(|asm_target| {
-        asm_target.arch == target.arch && asm_target.oss.contains(&target.os.as_ref())
-    });
+    let asm_target = ASM_TARGETS
+        .iter()
+        .find(|asm_target| asm_target.arch == target.arch && asm_target.oss.contains(&target.os.as_ref()));
 
-    let asm_dir = if use_pregenerated {
-        &pregenerated
-    } else {
-        out_dir
-    };
+    let asm_dir = if use_pregenerated { &pregenerated } else { out_dir };
 
-    generate_prefix_symbols_header(out_dir, "prefix_symbols.h", '#', None, ring_core_prefix)
-        .unwrap();
+    generate_prefix_symbols_header(out_dir, "prefix_symbols.h", '#', None, ring_core_prefix).unwrap();
 
     generate_prefix_symbols_asm_headers(out_dir, ring_core_prefix).unwrap();
 
@@ -479,18 +468,14 @@ fn build_c_code(
 
     let test_srcs = RING_TEST_SRCS.iter().map(PathBuf::from).collect::<Vec<_>>();
 
-    let libs = [
-        ("", &core_srcs[..], &asm_srcs[..]),
-        ("test", &test_srcs[..], &[]),
-    ];
+    let libs = [("", &core_srcs[..], &asm_srcs[..]), ("test", &test_srcs[..], &[])];
 
     // XXX: Ideally, ring-test would only be built for `cargo test`, but Cargo
     // can't do that yet.
-    libs.iter()
-        .for_each(|&(lib_name_suffix, srcs, additional_srcs)| {
-            let lib_name = String::from(ring_core_prefix) + lib_name_suffix;
-            build_library(target, out_dir, &lib_name, srcs, additional_srcs)
-        });
+    libs.iter().for_each(|&(lib_name_suffix, srcs, additional_srcs)| {
+        let lib_name = String::from(ring_core_prefix) + lib_name_suffix;
+        build_library(target, out_dir, &lib_name, srcs, additional_srcs)
+    });
 
     println!(
         "cargo:rustc-link-search=native={}",
@@ -498,13 +483,7 @@ fn build_c_code(
     );
 }
 
-fn build_library(
-    target: &Target,
-    out_dir: &Path,
-    lib_name: &str,
-    srcs: &[PathBuf],
-    additional_srcs: &[PathBuf],
-) {
+fn build_library(target: &Target, out_dir: &Path, lib_name: &str, srcs: &[PathBuf], additional_srcs: &[PathBuf]) {
     // Compile all the (dirty) source files into object files.
     let objs = additional_srcs
         .iter()
@@ -524,10 +503,10 @@ fn build_library(
         "macos" => {
             let _ = c.flag("-fPIC");
             let _ = c.flag("-Wl,-dead_strip");
-        }
+        },
         _ => {
             let _ = c.flag("-Wl,--gc-sections");
-        }
+        },
     }
     for o in objs {
         let _ = c.object(o);
@@ -536,12 +515,7 @@ fn build_library(
     // Handled below.
     let _ = c.cargo_metadata(false);
 
-    c.compile(
-        lib_path
-            .file_name()
-            .and_then(|f| f.to_str())
-            .expect("No filename"),
-    );
+    c.compile(lib_path.file_name().and_then(|f| f.to_str()).expect("No filename"));
 
     // Link the library. This works even when the library doesn't need to be
     // rebuilt.
@@ -591,18 +565,14 @@ fn cc(file: &Path, ext: &str, target: &Target, include_dir: &Path, out_file: &Pa
             for f in c_flags(&compiler) {
                 let _ = c.flag(f);
             }
-        }
+        },
         "S" => (),
         e => panic!("Unsupported file extension: {:?}", e),
     };
     for f in cpp_flags(&compiler) {
         let _ = c.flag(f);
     }
-    if target.os != "none"
-        && target.os != "redox"
-        && target.os != "windows"
-        && target.arch != "wasm32"
-    {
+    if target.os != "none" && target.os != "redox" && target.os != "windows" && target.arch != "wasm32" {
         let _ = c.flag("-fstack-protector");
     }
 
@@ -630,7 +600,7 @@ fn cc(file: &Path, ext: &str, target: &Target, include_dir: &Path, out_file: &Pa
     // Allow cross-compiling without a target sysroot for these targets.
     //
     // poly1305_vec.c requires <emmintrin.h> which requires <stdlib.h>.
-    if (target.arch == "wasm32" && target.os == "unknown")
+    if (target.arch == "wasm32"/* && target.os == "unknown" */)
         || (target.os == "linux" && target.is_musl && target.arch != "x86_64")
     {
         if let Ok(compiler) = c.try_get_compiler() {
@@ -658,11 +628,7 @@ fn cc(file: &Path, ext: &str, target: &Target, include_dir: &Path, out_file: &Pa
     let mut c = c.get_compiler().to_command();
     let _ = c
         .arg("-c")
-        .arg(format!(
-            "{}{}",
-            obj_opt,
-            out_file.to_str().expect("Invalid path")
-        ))
+        .arg(format!("{}{}", obj_opt, out_file.to_str().expect("Invalid path")))
         .arg(file);
     c
 }
@@ -676,9 +642,7 @@ fn nasm(file: &Path, arch: &str, include_dir: &Path, out_file: &Path) -> Command
 
     // Nasm requires that the path end in a path separator.
     let mut include_dir = include_dir.as_os_str().to_os_string();
-    include_dir.push(std::ffi::OsString::from(String::from(
-        std::path::MAIN_SEPARATOR,
-    )));
+    include_dir.push(std::ffi::OsString::from(String::from(std::path::MAIN_SEPARATOR)));
 
     let mut c = Command::new("./target/tools/windows/nasm/nasm");
     let _ = c
@@ -739,10 +703,7 @@ fn perlasm_src_dsts(out_dir: &Path, asm_target: &AsmTarget) -> Vec<(PathBuf, Pat
             let concrete_path = PathBuf::from(concrete);
             if srcs.contains(&concrete_path) {
                 let synthesized_path = PathBuf::from(synthesized);
-                src_dsts.push((
-                    concrete_path,
-                    asm_path(out_dir, &synthesized_path, asm_target),
-                ))
+                src_dsts.push((concrete_path, asm_path(out_dir, &synthesized_path, asm_target)))
             }
         };
         maybe_synthesize(SHA512_X86_64, SHA256_X86_64);
@@ -753,10 +714,7 @@ fn perlasm_src_dsts(out_dir: &Path, asm_target: &AsmTarget) -> Vec<(PathBuf, Pat
 }
 
 fn asm_srcs(perlasm_src_dsts: Vec<(PathBuf, PathBuf)>) -> Vec<PathBuf> {
-    perlasm_src_dsts
-        .into_iter()
-        .map(|(_src, dst)| dst)
-        .collect::<Vec<_>>()
+    perlasm_src_dsts.into_iter().map(|(_src, dst)| dst).collect::<Vec<_>>()
 }
 
 fn is_perlasm(path: &PathBuf) -> bool {
@@ -776,20 +734,14 @@ fn asm_path(out_dir: &Path, src: &Path, asm_target: &AsmTarget) -> PathBuf {
 
 fn perlasm(src_dst: &[(PathBuf, PathBuf)], asm_target: &AsmTarget) {
     for (src, dst) in src_dst {
-        let mut args = vec![
-            src.to_string_lossy().into_owned(),
-            asm_target.perlasm_format.to_owned(),
-        ];
+        let mut args = vec![src.to_string_lossy().into_owned(), asm_target.perlasm_format.to_owned()];
         if asm_target.arch == "x86" {
             args.push("-fPIC".into());
             args.push("-DOPENSSL_IA32_SSE2".into());
         }
         // Work around PerlAsm issue for ARM and AAarch64 targets by replacing
         // back slashes with forward slashes.
-        let dst = dst
-            .to_str()
-            .expect("Could not convert path")
-            .replace("\\", "/");
+        let dst = dst.to_str().expect("Could not convert path").replace("\\", "/");
         args.push(dst);
         run_command_with_args(&get_command("PERL_EXECUTABLE", "perl"), &args);
     }
@@ -808,10 +760,10 @@ fn emit_rerun_if_changed() {
             match path.extension().and_then(|ext| ext.to_str()) {
                 Some("c") | Some("S") | Some("h") | Some("inl") | Some("pl") | None => {
                     println!("cargo:rerun-if-changed={}", path.to_str().unwrap());
-                }
+                },
                 _ => {
                     // Ignore other types of files.
-                }
+                },
             }
         })
     }
